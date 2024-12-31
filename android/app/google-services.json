@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1054859281894",
+    "project_id": "aquasync-48758",
+    "storage_bucket": "aquasync-48758.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1054859281894:android:b3577184f79ee3343cc227",
+        "android_client_info": {
+          "package_name": "com.aquasync.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAKqWk2XYRb4XPrEwwnELsaBHNkhoTP-F0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
