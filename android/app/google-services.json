@@ -12,7 +12,20 @@
           "package_name": "com.aquasync.app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "1054859281894-ufftqpass00p1bqg9fi595tcfnmn1g6v.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.aquasync.app",
+            "certificate_hash": "0b64785fbc630aebcd312afcdc23a47ac1e69153"
+          }
+        },
+        {
+          "client_id": "1054859281894-ijkkivr73m4321t197psv2h8jj4uf6k6.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAKqWk2XYRb4XPrEwwnELsaBHNkhoTP-F0"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1054859281894-ijkkivr73m4321t197psv2h8jj4uf6k6.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

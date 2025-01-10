@@ -4,12 +4,14 @@ import 'firebase_options.dart';
 import 'package:provider/provider.dart';
 import 'package:aquasync/aqua_sync_provider.dart';
 import 'package:aquasync/aqua_sync_screen.dart';
+import 'package:aquasync/login_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
   runApp(MyApp());
 }
 
@@ -23,7 +25,11 @@ class MyApp extends StatelessWidget {
       child: MaterialApp(
         title: 'Water Tracker',
         theme: ThemeData(primarySwatch: Colors.blue),
-        home: AquaSyncScreen(),
+        home: Consumer<AquaSyncProvider>(
+          builder: (context, provider, _) {
+            return provider.user == null ? LoginScreen() : AquaSyncScreen();
+          },
+        ),
       ),
     );
   }

@@ -1,1 +1,34 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"aquasync-48758","appId":"1:1054859281894:android:b3577184f79ee3343cc227","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"aquasync-48758","configurations":{"android":"1:1054859281894:android:b3577184f79ee3343cc227"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "aquasync-48758",
+          "appId": "1:1054859281894:android:b3577184f79ee3343cc227",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "aquasync-48758",
+          "configurations": {
+            "android": "1:1054859281894:android:b3577184f79ee3343cc227"
+          }
+        }
+      }
+    }
+  },
+  "emulators": {
+    "firestore": {
+      "port": 8080
+    },
+    "ui": {
+      "enabled": true
+    },
+    "singleProjectMode": true
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
+}
