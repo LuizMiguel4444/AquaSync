@@ -2,13 +2,13 @@
 
 import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:googleapis_auth/auth_io.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 
 class AquaSyncProvider with ChangeNotifier {
@@ -16,6 +16,7 @@ class AquaSyncProvider with ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
+  final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
   User? user;
   int myWaterConsumption = 0;
@@ -25,6 +26,7 @@ class AquaSyncProvider with ChangeNotifier {
   AquaSyncProvider() {
     _checkUser();
     _loadFirebaseServiceAccount();
+    _initializeLocalNotifications();
   }
 
   void _checkUser() {
@@ -47,8 +49,7 @@ class AquaSyncProvider with ChangeNotifier {
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       if (googleUser == null) return;
 
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
@@ -172,6 +173,10 @@ class AquaSyncProvider with ChangeNotifier {
       // Configurar recebimento de mensagens
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
         if (message.notification != null) {
+          _showNotification(
+            message.notification!.title ?? 'Nova Notificação',
+            message.notification!.body ?? 'Você tem uma nova mensagem!',
+          );
           print('Mensagem recebida: ${message.notification!.title}');
         }
       });
@@ -180,66 +185,96 @@ class AquaSyncProvider with ChangeNotifier {
     }
   }
 
-Future<void> _sendPushNotificationV1(String token, String title, String body) async {
-  if (firebaseServiceAccount == null) {
-    print("Credenciais do Firebase não foram carregadas!");
-    return;
-  }
-  
-  // Carregar credenciais diretamente do JSON já decodificado
-  final credentials = ServiceAccountCredentials.fromJson(firebaseServiceAccount!);
+  Future<void> _sendPushNotificationV1(String token, String title, String body) async {
+    if (firebaseServiceAccount == null) {
+      print("Credenciais do Firebase não foram carregadas!");
+      return;
+    }
+    
+    // Carregar credenciais diretamente do JSON já decodificado
+    final credentials = ServiceAccountCredentials.fromJson(firebaseServiceAccount!);
 
-  // Escopo para o Firebase Cloud Messaging
-  const scopes = ['https://www.googleapis.com/auth/firebase.messaging'];
+    // Escopo para o Firebase Cloud Messaging
+    const scopes = ['https://www.googleapis.com/auth/firebase.messaging'];
 
-  // Obter o cliente autenticado
-  final client = await clientViaServiceAccount(credentials, scopes);
+    // Obter o cliente autenticado
+    final client = await clientViaServiceAccount(credentials, scopes);
 
-  // Construir o payload da notificação
-  final payload = {
-    'message': {
-      'token': token,
-      'notification': {
-        'title': title,
-        'body': body,
-      },
-      'android': {
-        'priority': 'HIGH',
-      },
-      'apns': {
-        'headers': {
-          'apns-priority': '10',
+    // Construir o payload da notificação
+    final payload = {
+      'message': {
+        'token': token,
+        'notification': {
+          'title': title,
+          'body': body,
+        },
+        'android': {
+          'priority': 'HIGH',
+        },
+        'apns': {
+          'headers': {
+            'apns-priority': '10',
+          },
         },
       },
-    },
-  };
+    };
 
-  // Fazer a solicitação HTTP POST para a API FCM V1
-  final url = 'https://fcm.googleapis.com/v1/projects/aquasync-48758/messages:send';
-  final response = await client.post(
-    Uri.parse(url),
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: jsonEncode(payload),
-  );
+    // Fazer a solicitação HTTP POST para a API FCM V1
+    final url = 'https://fcm.googleapis.com/v1/projects/aquasync-48758/messages:send';
+    final response = await client.post(
+      Uri.parse(url),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode(payload),
+    );
 
-  // Verificar o status da resposta
-  if (response.statusCode == 200) {
-    print('Notificação enviada com sucesso!');
-  } else {
-    print('Erro ao enviar notificação: ${response.body}');
+    // Verificar o status da resposta
+    if (response.statusCode == 200) {
+      print('Notificação enviada com sucesso!');
+    } else {
+      print('Erro ao enviar notificação: ${response.body}');
+    }
+
+    // Fechar o cliente
+    client.close();
   }
-
-  // Fechar o cliente
-  client.close();
-}
 
   Future<void> signOut() async {
     await _googleSignIn.signOut();
     await _auth.signOut();
     user = null;
     notifyListeners();
+  }
+
+  Future<void> _initializeLocalNotifications() async {
+    const AndroidInitializationSettings androidSettings =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+
+    const InitializationSettings initializationSettings =
+        InitializationSettings(android: androidSettings);
+
+    await _flutterLocalNotificationsPlugin.initialize(initializationSettings);
+  }
+
+  Future<void> _showNotification(String title, String body) async {
+    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+      'channel_id', // ID do canal
+      'Canal de Notificações', // Nome do canal
+      channelDescription: 'Este canal é usado para notificações do app.',
+      importance: Importance.high,
+      priority: Priority.high,
+    );
+
+    const NotificationDetails notificationDetails =
+        NotificationDetails(android: androidDetails);
+
+    await _flutterLocalNotificationsPlugin.show(
+      0, // ID da notificação
+      title, // Título
+      body, // Corpo
+      notificationDetails,
+    );
   }
 }
 
