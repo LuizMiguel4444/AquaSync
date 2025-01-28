@@ -1,5 +1,3 @@
-// ignore_for_file: avoid_print
-
 import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -7,6 +5,8 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:googleapis_auth/auth_io.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
@@ -21,17 +21,41 @@ class AquaSyncProvider with ChangeNotifier {
   User? user;
   int myWaterConsumption = 0;
   int partnerWaterConsumption = 0;
+  String? partnerDisplayName;
+  String? partnerUid;
   Map<String, dynamic>? firebaseServiceAccount;
+  final int dailyGoal = 3000;
+
+  var isDarkMode = false.obs;
 
   AquaSyncProvider() {
     _checkUser();
     _loadFirebaseServiceAccount();
     _initializeLocalNotifications();
+    _loadThemePreferences();
+  }
+
+  void toggleTheme() async {
+    isDarkMode.value = !isDarkMode.value;
+    await _saveThemePreference();
+    Get.changeThemeMode(isDarkMode.value ? ThemeMode.dark : ThemeMode.light);
+  }
+
+  Future<void> _loadThemePreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    isDarkMode.value = prefs.getBool('isDarkMode') ?? false;
+    Get.changeThemeMode(isDarkMode.value ? ThemeMode.dark : ThemeMode.light);
+  }
+
+  Future<void> _saveThemePreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isDarkMode', isDarkMode.value);
   }
 
   void _checkUser() {
     user = _auth.currentUser;
     if (user != null) {
+      _loadUserData();
       _initializeMessaging();
       _subscribeToUpdates();
     }
@@ -39,7 +63,6 @@ class AquaSyncProvider with ChangeNotifier {
   }
 
   Future<void> _loadFirebaseServiceAccount() async {
-    // Carregar o arquivo JSON das credenciais do `assets`
     final data = await rootBundle.loadString('assets/firebase-service-account.json');
     firebaseServiceAccount = jsonDecode(data);
   }
@@ -69,25 +92,18 @@ class AquaSyncProvider with ChangeNotifier {
     if (user == null) return;
 
     final userDocRef = _firestore.collection('users').doc(user!.uid);
-    final trackerDocRef = _firestore.collection('water_tracker').doc(user!.uid);
     final fcmToken = await _messaging.getToken();
 
     final userDoc = await userDocRef.get();
     if (!userDoc.exists) {
       await userDocRef.set({
+        'uid': user!.uid,
+        'email': user!.email,
+        'displayName': user!.displayName ?? 'Usuário',
         'myWaterConsumption': 0,
-        'partnerWaterConsumption': 0,
+        'partnerUid': null,
         'fcmToken': fcmToken,
-        'uid': user!.uid,
-      });
-    }
-
-    final trackerDoc = await trackerDocRef.get();
-    if (!trackerDoc.exists) {
-      await trackerDocRef.set({
-        'myWaterConsumption': 0,
-        'partnerWaterConsumption': 0,
-        'uid': user!.uid,
+        'dailyHistory': {},
       });
     }
   }
@@ -97,35 +113,24 @@ class AquaSyncProvider with ChangeNotifier {
 
     myWaterConsumption += amount;
 
-    // Receber minhas próprias notificações ou não
-    bool notifySelf = true;
-
-    // Atualizar o Firestore em `users`
-    await _firestore.collection('users').doc(user!.uid).set({
+    // Atualizar o consumo no Firestore
+    await _firestore.collection('users').doc(user!.uid).update({
       'myWaterConsumption': myWaterConsumption,
-    }, SetOptions(merge: true));
+    });
 
-    // Atualizar o Firestore com o novo consumo
-    await _firestore.collection('water_tracker').doc(user!.uid).set({
-      'myWaterConsumption': myWaterConsumption,
-    }, SetOptions(merge: true));
+    // Notificar parceiro, se vinculado
+    final partnerSnapshot = await _firestore.collection('users').doc(user!.uid).get();
+    final partnerUid = partnerSnapshot.data()?['partnerUid'];
 
-    // Obter tokens FCM dos usuários e enviar notificações
-    final userDocs = await _firestore.collection('users').get();
-    for (var doc in userDocs.docs) {
-      final data = doc.data();
-      final token = data['fcmToken'];
+    if (partnerUid != null) {
+      final partnerDoc = await _firestore.collection('users').doc(partnerUid).get();
+      final partnerFcmToken = partnerDoc.data()?['fcmToken'];
 
-      if (token != null && (notifySelf)) {
-        // Enviar notificação para o dispositivo com o token correspondente
+      if (partnerFcmToken != null) {
         await _sendPushNotificationV1(
-          token,
-          doc.id == user!.uid
-              ? 'Seu consumo foi atualizado!'
-              : 'Atualização no consumo de um amigo!',
-          doc.id == user!.uid
-              ? 'Você adicionou $amount ml ao seu consumo de água.'
-              : '${user!.displayName ?? "Um usuário"} adicionou $amount ml ao consumo de água.',
+          partnerFcmToken,
+          'Seu parceiro bebeu água!',
+          '${user!.displayName ?? "Um usuário"} adicionou $amount ml ao consumo de água.',
         );
       }
     }
@@ -133,26 +138,198 @@ class AquaSyncProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  Future<bool> setPartner(String partnerEmail) async {
+    if (user == null) return false;
+
+    try {
+      // Impedir vínculo com a própria conta
+      if (partnerEmail == user!.email) {
+        print('Erro: Não é possível vincular a própria conta.');
+        return false;
+      }
+
+      final querySnapshot = await _firestore
+          .collection('users')
+          .where('email', isEqualTo: partnerEmail)
+          .limit(1)
+          .get();
+
+      if (querySnapshot.docs.isEmpty) {
+        print('Erro: Parceiro não encontrado.');
+        return false;
+      }
+
+      final partnerDoc = querySnapshot.docs.first;
+      partnerUid = partnerDoc.id;
+
+      // Salvar o UID do parceiro no documento do usuário
+      await _firestore.collection('users').doc(user!.uid).update({
+        'partnerUid': partnerUid,
+      });
+
+      // Salvar o UID do usuário no documento do parceiro
+      await _firestore.collection('users').doc(partnerUid).update({
+        'partnerUid': user!.uid,
+      });
+
+      // Carregar informações do parceiro
+      partnerDisplayName = partnerDoc.data()['displayName'];
+      partnerWaterConsumption = partnerDoc.data()['myWaterConsumption'] ?? 0;
+
+      notifyListeners();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>?> getPartnerData() async {
+    final partnerSnapshot = await _firestore.collection('partners').doc(user!.uid).get();
+    final partnerUid = partnerSnapshot.data()?['partnerUid'];
+    if (partnerUid == null) return null;
+
+    final partnerDoc = await _firestore.collection('users').doc(partnerUid).get();
+    return partnerDoc.data();
+  }
+
+  Future<void> removePartner() async {
+    if (partnerUid == null || user == null) return;
+
+    // Remover vínculo no Firestore
+    await _firestore.collection('users').doc(user!.uid).update({
+      'partnerUid': null,
+    });
+
+    await _firestore.collection('users').doc(partnerUid).update({
+      'partnerUid': null,
+    });
+
+    partnerUid = null;
+    partnerDisplayName = null;
+    partnerWaterConsumption = 0;
+
+    notifyListeners();
+  }
+
+  Future<void> _loadUserData() async {
+    if (user == null) return;
+
+    final userDoc = await _firestore.collection('users').doc(user!.uid).get();
+    if (userDoc.exists) {
+      final data = userDoc.data()!;
+      myWaterConsumption = data['myWaterConsumption'] ?? 0;
+
+      // Carregar dados do parceiro, se vinculado
+      final partnerUid = data['partnerUid'];
+      if (partnerUid != null) {
+        final partnerDoc = await _firestore.collection('users').doc(partnerUid).get();
+        if (partnerDoc.exists) {
+          partnerWaterConsumption = partnerDoc.data()?['myWaterConsumption'] ?? 0;
+          partnerDisplayName = partnerDoc.data()?['displayName'];
+        }
+      } else {
+        partnerWaterConsumption = 0;
+        partnerDisplayName = null;
+      }
+
+      notifyListeners();
+    }
+  }
+
   void _subscribeToUpdates() {
     if (user == null) return;
 
-    // Atualizações da coleção `water_tracker`
-    _firestore.collection('water_tracker').doc(user!.uid).snapshots().listen((snapshot) {
+    // Atualizar consumo do usuário
+    _firestore.collection('users').doc(user!.uid).snapshots().listen((snapshot) {
       if (snapshot.exists && snapshot.data() != null) {
         final data = snapshot.data()!;
         myWaterConsumption = data['myWaterConsumption'] ?? 0;
+        
+        // Atualizar dados do parceiro se ele estiver vinculado
+        final newPartnerUid = data['partnerUid'];
+        if (newPartnerUid != null && newPartnerUid != partnerUid) {
+          partnerUid = newPartnerUid;
+          _loadUserData(); // Recarregar dados do parceiro
+        }
+
         notifyListeners();
       }
     });
 
-    // Atualizações da coleção `users`
-    _firestore.collection('users').doc(user!.uid).snapshots().listen((snapshot) {
-      if (snapshot.exists && snapshot.data() != null) {
-        final data = snapshot.data()!;
-        partnerWaterConsumption = data['partnerWaterConsumption'] ?? 0;
-        notifyListeners();
+    // Atualizar dados do parceiro
+    _firestore.collection('users').doc(user!.uid).snapshots().listen((snapshot) async {
+      final partnerUid = snapshot.data()?['partnerUid'];
+      if (partnerUid != null) {
+        final partnerDoc = await _firestore.collection('users').doc(partnerUid).get();
+        if (partnerDoc.exists) {
+          partnerWaterConsumption = partnerDoc.data()?['myWaterConsumption'] ?? 0;
+          partnerDisplayName = partnerDoc.data()?['displayName'];
+          notifyListeners();
+        }
       }
     });
+  }
+
+  Future<void> _initializeDailyReset() async {
+    final now = DateTime.now();
+    final nextMidnight = DateTime(now.year, now.month, now.day + 1);
+
+    final durationUntilMidnight = nextMidnight.difference(now);
+
+    Future.delayed(durationUntilMidnight, () async {
+      await _resetDailyConsumption();
+      _initializeDailyReset(); // Reagendar o reset para o dia seguinte
+    });
+  }
+
+  Future<void> _resetDailyConsumption() async {
+    if (user == null) return;
+
+    final now = DateTime.now();
+    final today = now.toIso8601String().split('T').first;
+
+    final userDocRef = _firestore.collection('users').doc(user!.uid);
+    final userDoc = await userDocRef.get();
+    final history = Map<String, dynamic>.from(userDoc.data()?['dailyHistory'] ?? {});
+
+    // Armazena o consumo de hoje antes de zerar
+    history[today] = myWaterConsumption;
+
+    await userDocRef.update({
+      'myWaterConsumption': 0,
+      'dailyHistory': history,
+    });
+
+    myWaterConsumption = 0;
+    notifyListeners();
+  }
+
+  Future<Map<String, int>> getLast7DaysConsumption() async {
+    if (user == null) return {};
+
+    final userDoc = await _firestore.collection('users').doc(user!.uid).get();
+    final history = Map<String, dynamic>.from(userDoc.data()?['dailyHistory'] ?? {});
+    final now = DateTime.now();
+    final last7Days = List.generate(7, (i) => now.subtract(Duration(days: i)));
+
+    return Map.fromEntries(last7Days.map((date) {
+      final formattedDate = date.toIso8601String().split('T').first;
+      return MapEntry(formattedDate, history[formattedDate] ?? (formattedDate == now.toIso8601String().split('T').first ? myWaterConsumption : 0));
+    }));
+  }
+
+  Future<Map<String, int>> getLast7DaysPartnerConsumption() async {
+    if (partnerUid == null) return {};
+
+    final partnerDoc = await _firestore.collection('users').doc(partnerUid).get();
+    final history = Map<String, dynamic>.from(partnerDoc.data()?['dailyHistory'] ?? {});
+    final now = DateTime.now();
+    final last7Days = List.generate(7, (i) => now.subtract(Duration(days: i)));
+
+    return Map.fromEntries(last7Days.map((date) {
+      final formattedDate = date.toIso8601String().split('T').first;
+      return MapEntry(formattedDate, history[formattedDate] ?? (formattedDate == now.toIso8601String().split('T').first ? partnerWaterConsumption : 0));
+    }));
   }
 
   Future<void> _initializeMessaging() async {
@@ -243,7 +420,13 @@ class AquaSyncProvider with ChangeNotifier {
   Future<void> signOut() async {
     await _googleSignIn.signOut();
     await _auth.signOut();
+
     user = null;
+    myWaterConsumption = 0;
+    partnerWaterConsumption = 0;
+    partnerDisplayName = null;
+    partnerUid = null;
+
     notifyListeners();
   }
 
