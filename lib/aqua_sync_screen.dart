@@ -25,9 +25,11 @@ class _AquaSyncScreenState extends State<AquaSyncScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Aqua Sync'),
+        backgroundColor: Theme.of(context).brightness == Brightness.dark ? const Color.fromARGB(255, 75, 55, 140) : const Color.fromARGB(255, 235, 220, 255),
         actions: [
           IconButton(
-            icon: Obx(() => Icon(themeController.isDarkMode.value ? Icons.light_mode : Icons.dark_mode)),
+            icon: Obx(() =>
+                Icon(themeController.isDarkMode.value ? Icons.light_mode : Icons.dark_mode)),
             onPressed: () {
               themeController.toggleTheme();
             },
@@ -44,59 +46,66 @@ class _AquaSyncScreenState extends State<AquaSyncScreen> {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            _buildWaterBottle(provider),
-            const SizedBox(height: 20),
-            Text(
-              'Meu Consumo: ${provider.myWaterConsumption} ml',
-              style: const TextStyle(fontSize: 18),
-            ),
-            if (provider.partnerDisplayName != null) ...[
-              const SizedBox(height: 10),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              _buildWaterBottle(provider),
+              const SizedBox(height: 20),
               Text(
-                'Parceiro: ${provider.partnerDisplayName}',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              Text(
-                'Consumo do Parceiro: ${provider.partnerWaterConsumption} ml',
+                'Meu Consumo: ${provider.myWaterConsumption} ml',
                 style: const TextStyle(fontSize: 18),
+                textAlign: TextAlign.center,
               ),
-            ],
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () => _showAddWaterDialog(context, provider),
-              child: const Text('Adicionar Consumo'),
-            ),
-            const SizedBox(height: 10),
-            ElevatedButton(
-              onPressed: provider.partnerUid == null
-                  ? () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const PartnerLinkScreen(),
-                        ),
-                      );
-                    }
-                  : null,
-              child: const Text('Vincular Parceiro'),
-            ),
-            if (provider.partnerUid != null) ...[
+              if (provider.partnerDisplayName != null) ...[
+                const SizedBox(height: 10),
+                Text(
+                  'Parceiro: ${provider.partnerDisplayName}',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
+                Text(
+                  'Consumo do Parceiro: ${provider.partnerWaterConsumption} ml',
+                  style: const TextStyle(fontSize: 18),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () => _showAddWaterDialog(context, provider),
+                child: const Text('Adicionar Consumo'),
+              ),
               const SizedBox(height: 10),
               ElevatedButton(
-                onPressed: () async {
-                  await provider.removePartner();
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                    content: Text('Parceiro removido com sucesso!'),
-                  ));
-                },
-                child: const Text('Remover Parceiro'),
+                onPressed: provider.partnerUid == null
+                    ? () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const PartnerLinkScreen(),
+                          ),
+                        );
+                      }
+                    : null,
+                child: const Text('Vincular Parceiro'),
               ),
+              if (provider.partnerUid != null) ...[
+                const SizedBox(height: 10),
+                ElevatedButton(
+                  onPressed: () async {
+                    await provider.removePartner();
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text('Parceiro removido com sucesso!'),
+                    ));
+                  },
+                  child: const Text('Remover Parceiro'),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
       floatingActionButton: FloatingActionButton(
@@ -113,7 +122,7 @@ class _AquaSyncScreenState extends State<AquaSyncScreen> {
 
   Widget _buildWaterBottle(AquaSyncProvider provider) {
     double progress = provider.myWaterConsumption / dailyGoal;
-    progress = progress.clamp(0.0, 1.0); // Garantir que o progresso fique entre 0 e 1
+    progress = progress.clamp(0.0, 1.0);
 
     return Stack(
       alignment: Alignment.bottomCenter,
@@ -148,12 +157,14 @@ class _AquaSyncScreenState extends State<AquaSyncScreen> {
         int amount = 0;
         return AlertDialog(
           title: const Text('Adicionar Água'),
-          content: TextField(
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'Quantidade em ml'),
-            onChanged: (value) {
-              amount = int.tryParse(value) ?? 0;
-            },
+          content: SingleChildScrollView( // Permite rolagem dentro do dialog
+            child: TextField(
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Quantidade em ml'),
+              onChanged: (value) {
+                amount = int.tryParse(value) ?? 0;
+              },
+            ),
           ),
           actions: [
             TextButton(

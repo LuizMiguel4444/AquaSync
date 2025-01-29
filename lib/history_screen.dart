@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:aquasync/aqua_sync_provider.dart';
+import 'package:intl/intl.dart';
 
 class HistoryScreen extends StatelessWidget {
   const HistoryScreen({super.key});
@@ -10,7 +11,10 @@ class HistoryScreen extends StatelessWidget {
     final provider = Provider.of<AquaSyncProvider>(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Histórico de Consumo')),
+      appBar: AppBar(
+        title: const Text('Histórico de Consumo'),
+        backgroundColor: Theme.of(context).brightness == Brightness.dark ? const Color.fromARGB(255, 75, 55, 140) : const Color.fromARGB(255, 235, 220, 255),
+      ),
       body: FutureBuilder<Map<String, int>>(
         future: provider.getLast7DaysConsumption(),
         builder: (context, snapshot) {
@@ -29,9 +33,10 @@ class HistoryScreen extends StatelessWidget {
                   ),
                 ),
                 ...userHistory.entries.map((entry) {
+                  String formattedDate = _formatDate(entry.key);
                   return ListTile(
-                    title: Text('Dia: ${entry.key}'),
-                    subtitle: Text('Consumo: ${entry.value} ml'),
+                    title: Text('Dia: $formattedDate', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    subtitle: Text('Consumo: ${entry.value} ml', style: TextStyle(fontSize: 12)),
                   );
                 }),
                 if (provider.partnerUid != null)
@@ -54,9 +59,10 @@ class HistoryScreen extends StatelessWidget {
                               ),
                             ),
                             ...partnerHistory.entries.map((entry) {
+                              String formattedDate = _formatDate(entry.key);
                               return ListTile(
-                                title: Text('Dia: ${entry.key}'),
-                                subtitle: Text('Consumo: ${entry.value} ml'),
+                                title: Text('Dia: $formattedDate', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                                subtitle: Text('Consumo: ${entry.value} ml', style: TextStyle(fontSize: 12)),
                               );
                             }),
                           ],
@@ -78,5 +84,10 @@ class HistoryScreen extends StatelessWidget {
         },
       ),
     );
+  }
+
+  String _formatDate(String date) {
+    DateTime parsedDate = DateTime.parse(date);
+    return DateFormat('dd/MM/yyyy').format(parsedDate);
   }
 }

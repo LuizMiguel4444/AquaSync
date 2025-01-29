@@ -11,7 +11,10 @@ class PartnerLinkScreen extends StatelessWidget {
     final emailController = TextEditingController();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Vincular Parceiro')),
+      appBar: AppBar(
+        title: const Text('Vincular Parceiro'),
+        backgroundColor: Theme.of(context).brightness == Brightness.dark ? const Color.fromARGB(255, 75, 55, 140) : const Color.fromARGB(255, 235, 220, 255),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(

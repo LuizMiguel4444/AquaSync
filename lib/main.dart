@@ -31,7 +31,8 @@ class MyApp extends StatelessWidget {
       return ChangeNotifierProvider(
         create: (_) => AquaSyncProvider(),
         child: GetMaterialApp(
-          title: 'Water Tracker',
+          debugShowCheckedModeBanner: false,
+          title: 'Aqua Sync',
           themeMode: _themeController.isDarkMode.value ? ThemeMode.dark : ThemeMode.light,
           darkTheme: ThemeData.dark(),
           theme: ThemeData.light(),
