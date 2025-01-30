@@ -6,6 +6,8 @@ import 'package:aquasync/history_screen.dart';
 import 'package:aquasync/partner_link_screen.dart';
 import 'package:get/get.dart';
 import 'package:aquasync/theme_controller.dart';
+import 'package:wave/config.dart';
+import 'package:wave/wave.dart';
 
 class AquaSyncScreen extends StatefulWidget {
   const AquaSyncScreen({super.key});
@@ -55,11 +57,6 @@ class _AquaSyncScreenState extends State<AquaSyncScreen> {
             children: [
               _buildWaterBottle(provider),
               const SizedBox(height: 20),
-              Text(
-                'Meu Consumo: ${provider.myWaterConsumption} ml',
-                style: const TextStyle(fontSize: 18),
-                textAlign: TextAlign.center,
-              ),
               if (provider.partnerDisplayName != null) ...[
                 const SizedBox(height: 10),
                 Text(
@@ -125,26 +122,49 @@ class _AquaSyncScreenState extends State<AquaSyncScreen> {
     progress = progress.clamp(0.0, 1.0);
 
     return Stack(
-      alignment: Alignment.bottomCenter,
+      alignment: Alignment.center,
       children: [
         Container(
           height: 300,
-          width: 150,
+          width: 200,
           decoration: BoxDecoration(
             border: Border.all(color: Colors.blue, width: 2),
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-        Container(
-          height: 300 * progress,
-          width: 150,
-          decoration: BoxDecoration(
-            color: Colors.blue,
             borderRadius: const BorderRadius.only(
-              bottomLeft: Radius.circular(10),
-              bottomRight: Radius.circular(10),
+              bottomLeft: Radius.circular(20),
+              bottomRight: Radius.circular(20),
             ),
           ),
+        ),
+        Positioned(
+          bottom: 0,
+          child: ClipRRect(
+            borderRadius: const BorderRadius.only(
+              bottomLeft: Radius.circular(20),
+              bottomRight: Radius.circular(20),
+            ),
+            child: SizedBox(
+              height: 300 * progress,
+              width: 200,
+              child: progress < 1 ? WaveWidget(
+                config: CustomConfig(
+                  gradients: [
+                    [Colors.blue, Colors.blueAccent],
+                    [Colors.lightBlue, Colors.lightBlueAccent],
+                  ],
+                  durations: [3000, 2200],
+                  heightPercentages: [0.0, 0.02],
+                ),
+                waveAmplitude: 0,
+                size: const Size(double.infinity, double.infinity),
+              ) : Container(
+                color: Colors.lightBlueAccent,
+              )
+            ),
+          ),
+        ),
+        Text(
+          '${provider.myWaterConsumption} ml',
+          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
         ),
       ],
     );
@@ -157,7 +177,7 @@ class _AquaSyncScreenState extends State<AquaSyncScreen> {
         int amount = 0;
         return AlertDialog(
           title: const Text('Adicionar Água'),
-          content: SingleChildScrollView( // Permite rolagem dentro do dialog
+          content: SingleChildScrollView(
             child: TextField(
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(labelText: 'Quantidade em ml'),
