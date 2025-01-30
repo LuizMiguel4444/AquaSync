@@ -8,6 +8,7 @@ import 'package:get/get.dart';
 import 'package:aquasync/theme_controller.dart';
 import 'package:wave/config.dart';
 import 'package:wave/wave.dart';
+import 'package:confetti/confetti.dart';
 
 class AquaSyncScreen extends StatefulWidget {
   const AquaSyncScreen({super.key});
@@ -18,6 +19,8 @@ class AquaSyncScreen extends StatefulWidget {
 
 class _AquaSyncScreenState extends State<AquaSyncScreen> {
   int dailyGoal = 3000;
+  final ConfettiController _confettiController = ConfettiController(duration: const Duration(seconds: 3));
+  bool _hasReachedGoal = false;
 
   @override
   Widget build(BuildContext context) {
@@ -48,62 +51,67 @@ class _AquaSyncScreenState extends State<AquaSyncScreen> {
           ),
         ],
       ),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              _buildWaterBottle(provider),
-              const SizedBox(height: 20),
-              if (provider.partnerDisplayName != null) ...[
-                const SizedBox(height: 10),
-                Text(
-                  'Parceiro: ${provider.partnerDisplayName}',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  textAlign: TextAlign.center,
-                ),
-                Text(
-                  'Consumo do Parceiro: ${provider.partnerWaterConsumption} ml',
-                  style: const TextStyle(fontSize: 18),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () => _showAddWaterDialog(context, provider),
-                child: const Text('Adicionar Consumo'),
+      body: Stack(
+          children: [ 
+            Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  _buildWaterBottle(provider),
+                  const SizedBox(height: 20),
+                  if (provider.partnerDisplayName != null) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      'Parceiro: ${provider.partnerDisplayName}',
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.center,
+                    ),
+                    Text(
+                      'Consumo do Parceiro: ${provider.partnerWaterConsumption} ml',
+                      style: const TextStyle(fontSize: 18),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    onPressed: () => _showAddWaterDialog(context, provider),
+                    child: const Text('Adicionar Consumo'),
+                  ),
+                  const SizedBox(height: 10),
+                  ElevatedButton(
+                    onPressed: provider.partnerUid == null
+                        ? () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const PartnerLinkScreen(),
+                              ),
+                            );
+                          }
+                        : null,
+                    child: const Text('Vincular Parceiro'),
+                  ),
+                  if (provider.partnerUid != null) ...[
+                    const SizedBox(height: 10),
+                    ElevatedButton(
+                      onPressed: () async {
+                        await provider.removePartner();
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                          content: Text('Parceiro removido com sucesso!'),
+                        ));
+                      },
+                      child: const Text('Remover Parceiro'),
+                    ),
+                  ],
+                ],
               ),
-              const SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: provider.partnerUid == null
-                    ? () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const PartnerLinkScreen(),
-                          ),
-                        );
-                      }
-                    : null,
-                child: const Text('Vincular Parceiro'),
-              ),
-              if (provider.partnerUid != null) ...[
-                const SizedBox(height: 10),
-                ElevatedButton(
-                  onPressed: () async {
-                    await provider.removePartner();
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                      content: Text('Parceiro removido com sucesso!'),
-                    ));
-                  },
-                  child: const Text('Remover Parceiro'),
-                ),
-              ],
-            ],
+            ),
           ),
-        ),
+          _buildConfetti(),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
@@ -115,6 +123,24 @@ class _AquaSyncScreenState extends State<AquaSyncScreen> {
         child: const Icon(Icons.history),
       ),
     );
+  }
+
+  void _checkDailyGoal(AquaSyncProvider provider) {
+    if (provider.myWaterConsumption >= dailyGoal && !_hasReachedGoal) {
+      _hasReachedGoal = true;
+      _confettiController.play();
+
+      Future.delayed(Duration.zero, () {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("🎉 Parabéns! Você atingiu sua meta diária!", textAlign: TextAlign.center),
+            duration: Duration(seconds: 5),
+          ),
+        );
+      });
+
+      _confettiController.play();
+    }
   }
 
   Widget _buildWaterBottle(AquaSyncProvider provider) {
@@ -170,6 +196,18 @@ class _AquaSyncScreenState extends State<AquaSyncScreen> {
     );
   }
 
+  Widget _buildConfetti() {
+    return Align(
+      alignment: Alignment.topCenter,
+      child: ConfettiWidget(
+        confettiController: _confettiController,
+        blastDirection: 3.14 / 2,
+        numberOfParticles: 50,
+        gravity: 0.5,
+      ),
+    );
+  }
+
   void _showAddWaterDialog(BuildContext context, AquaSyncProvider provider) {
     showDialog(
       context: context,
@@ -194,6 +232,7 @@ class _AquaSyncScreenState extends State<AquaSyncScreen> {
             ElevatedButton(
               onPressed: () {
                 provider.addWater(amount);
+                _checkDailyGoal(provider);
                 Navigator.pop(context);
               },
               child: const Text('Adicionar'),
