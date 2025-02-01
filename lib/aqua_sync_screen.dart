@@ -41,13 +41,7 @@ class _AquaSyncScreenState extends State<AquaSyncScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await provider.signOut();
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const LoginScreen()),
-              );
-            },
+            onPressed: () => _showLogoutDialog(context, provider),
           ),
         ],
       ),
@@ -97,12 +91,7 @@ class _AquaSyncScreenState extends State<AquaSyncScreen> {
                   if (provider.partnerUid != null) ...[
                     const SizedBox(height: 10),
                     ElevatedButton(
-                      onPressed: () async {
-                        await provider.removePartner();
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                          content: Text('Parceiro removido com sucesso!'),
-                        ));
-                      },
+                      onPressed: () => _showRemovePartnerDialog(context, provider),
                       child: const Text('Remover Parceiro'),
                     ),
                   ],
@@ -169,13 +158,13 @@ class _AquaSyncScreenState extends State<AquaSyncScreen> {
               bottomRight: Radius.circular(20),
             ),
             child: SizedBox(
-              height: 300 * progress,
+              height: 335 * progress,
               width: 200,
               child: progress < 1 ? WaveWidget(
                 config: CustomConfig(
                   gradients: [
                     [Colors.blue, Colors.blueAccent],
-                    [Colors.lightBlue, Colors.lightBlueAccent],
+                    [Colors.lightBlue, Colors.lightBlue],
                   ],
                   durations: [3000, 2200],
                   heightPercentages: [0.0, 0.02],
@@ -183,7 +172,7 @@ class _AquaSyncScreenState extends State<AquaSyncScreen> {
                 waveAmplitude: 0,
                 size: const Size(double.infinity, double.infinity),
               ) : Container(
-                color: Colors.lightBlueAccent,
+                color: Colors.lightBlue,
               )
             ),
           ),
@@ -236,6 +225,66 @@ class _AquaSyncScreenState extends State<AquaSyncScreen> {
                 Navigator.pop(context);
               },
               child: const Text('Adicionar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showLogoutDialog(BuildContext context, AquaSyncProvider provider) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Sair da Conta'),
+          content: const Text('Tem certeza de que deseja sair da sua conta?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context), // Fecha o diálogo sem sair
+              child: const Text('Não'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(context); // Fecha o diálogo
+                await provider.signOut();
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LoginScreen()),
+                );
+              },
+              child: const Text('Sim'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showRemovePartnerDialog(BuildContext context, AquaSyncProvider provider) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Remover Parceiro'),
+          content: const Text('Tem certeza de que deseja remover seu parceiro?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context), // Fecha o diálogo sem remover
+              child: const Text('Não'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(context); // Fecha o diálogo
+                await provider.removePartner();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Parceiro removido com sucesso!'),
+                    duration: Duration(seconds: 3),
+                  ),
+                );
+              },
+              child: const Text('Sim'),
             ),
           ],
         );
