@@ -6,6 +6,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:googleapis_auth/auth_io.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -33,6 +34,7 @@ class AquaSyncProvider with ChangeNotifier {
     _loadFirebaseServiceAccount();
     _initializeLocalNotifications();
     _loadThemePreferences();
+    _checkAndResetDailyConsumption();
   }
 
   void toggleTheme() async {
@@ -52,7 +54,7 @@ class AquaSyncProvider with ChangeNotifier {
     await prefs.setBool('isDarkMode', isDarkMode.value);
   }
 
-  void _checkUser() {
+  void _checkUser() async {
     user = _auth.currentUser;
     if (user != null) {
       _loadUserData();
@@ -103,7 +105,6 @@ class AquaSyncProvider with ChangeNotifier {
         'myWaterConsumption': 0,
         'partnerUid': null,
         'fcmToken': fcmToken,
-        'dailyHistory': {},
       });
     }
   }
@@ -113,10 +114,16 @@ class AquaSyncProvider with ChangeNotifier {
 
     myWaterConsumption += amount;
 
-    // Atualizar o consumo no Firestore
-    await _firestore.collection('users').doc(user!.uid).update({
-      'myWaterConsumption': myWaterConsumption,
-    });
+    final now = DateTime.now();
+    final today = now.toIso8601String().split('T').first;
+    final userDocRef = _firestore.collection('users').doc(user!.uid);
+    final dailyRef = userDocRef.collection(today);
+
+    // Atualiza o consumo do usuário
+    await userDocRef.update({'myWaterConsumption': myWaterConsumption});
+
+    // Atualiza a subcoleção do dia
+    await dailyRef.doc('consumption').set({'amount': myWaterConsumption}, SetOptions(merge: true));
 
     // Notificar parceiro, se vinculado
     final partnerSnapshot = await _firestore.collection('users').doc(user!.uid).get();
@@ -270,66 +277,92 @@ class AquaSyncProvider with ChangeNotifier {
     });
   }
 
-  Future<void> _initializeDailyReset() async {
-    final now = DateTime.now();
-    final nextMidnight = DateTime(now.year, now.month, now.day + 1);
+  Future<void> _ensureDailyConsumptionSaved(String date) async {
+    if (user == null) return;
 
-    final durationUntilMidnight = nextMidnight.difference(now);
+    final userDocRef = _firestore.collection('users').doc(user!.uid);
+    final dailyRef = userDocRef.collection(date);
 
-    Future.delayed(durationUntilMidnight, () async {
-      await _resetDailyConsumption();
-      _initializeDailyReset(); // Reagendar o reset para o dia seguinte
-    });
+    final existingDoc = await dailyRef.doc('consumption').get();
+
+    if (!existingDoc.exists) {
+      // **Se o dia ainda não foi salvo, salva o consumo antes de zerar**
+      await dailyRef.doc('consumption').set({'amount': myWaterConsumption}, SetOptions(merge: true));
+    }
   }
 
-  Future<void> _resetDailyConsumption() async {
+  Future<void> _checkAndResetDailyConsumption() async {
     if (user == null) return;
 
     final now = DateTime.now();
     final today = now.toIso8601String().split('T').first;
+    final yesterday = now.subtract(const Duration(days: 1)).toIso8601String().split('T').first;
 
-    final userDocRef = _firestore.collection('users').doc(user!.uid);
-    final userDoc = await userDocRef.get();
-    final history = Map<String, dynamic>.from(userDoc.data()?['dailyHistory'] ?? {});
+    final prefs = await SharedPreferences.getInstance();
+    String? lastSavedDate = prefs.getString('lastSavedDate');
 
-    // Armazena o consumo de hoje antes de zerar
-    history[today] = myWaterConsumption;
+    if (lastSavedDate != today) {
+      // **Antes de zerar, verifica se o consumo do dia anterior já foi salvo**
+      await _ensureDailyConsumptionSaved(yesterday);
 
-    await userDocRef.update({
-      'myWaterConsumption': 0,
-      'dailyHistory': history,
-    });
+      // **Zera apenas `myWaterConsumption` no documento principal do usuário**
+      await _firestore.collection('users').doc(user!.uid).update({'myWaterConsumption': 0});
+      myWaterConsumption = 0;
 
-    myWaterConsumption = 0;
-    notifyListeners();
+      // **Salva a nova data no SharedPreferences**
+      await prefs.setString('lastSavedDate', today);
+      notifyListeners();
+    }
   }
 
   Future<Map<String, int>> getLast7DaysConsumption() async {
     if (user == null) return {};
 
-    final userDoc = await _firestore.collection('users').doc(user!.uid).get();
-    final history = Map<String, dynamic>.from(userDoc.data()?['dailyHistory'] ?? {});
     final now = DateTime.now();
-    final last7Days = List.generate(7, (i) => now.subtract(Duration(days: i)));
+    final last7Days = List.generate(7, (i) => now.subtract(Duration(days: i + 1)));
+    final formattedDates = last7Days.map((date) => date.toIso8601String().split('T').first).toList();
 
-    return Map.fromEntries(last7Days.map((date) {
-      final formattedDate = date.toIso8601String().split('T').first;
-      return MapEntry(formattedDate, history[formattedDate] ?? (formattedDate == now.toIso8601String().split('T').first ? myWaterConsumption : 0));
-    }));
+    Map<String, int> history = {for (var date in formattedDates) date: 0};
+
+    for (var date in formattedDates) {
+      final doc = await _firestore
+          .collection('users')
+          .doc(user!.uid)
+          .collection(date)
+          .doc('consumption')
+          .get();
+
+      if (doc.exists) {
+        history[date] = doc.data()?['amount'] ?? 0;
+      }
+    }
+
+    return history;
   }
 
   Future<Map<String, int>> getLast7DaysPartnerConsumption() async {
     if (partnerUid == null) return {};
 
-    final partnerDoc = await _firestore.collection('users').doc(partnerUid).get();
-    final history = Map<String, dynamic>.from(partnerDoc.data()?['dailyHistory'] ?? {});
     final now = DateTime.now();
-    final last7Days = List.generate(7, (i) => now.subtract(Duration(days: i)));
+    final last7Days = List.generate(7, (i) => now.subtract(Duration(days: i + 1)));
+    final formattedDates = last7Days.map((date) => date.toIso8601String().split('T').first).toList();
 
-    return Map.fromEntries(last7Days.map((date) {
-      final formattedDate = date.toIso8601String().split('T').first;
-      return MapEntry(formattedDate, history[formattedDate] ?? (formattedDate == now.toIso8601String().split('T').first ? partnerWaterConsumption : 0));
-    }));
+    Map<String, int> history = {for (var date in formattedDates) date: 0};
+
+    for (var date in formattedDates) {
+      final doc = await _firestore
+          .collection('users')
+          .doc(partnerUid)
+          .collection(date)
+          .doc('consumption')
+          .get();
+
+      if (doc.exists) {
+        history[date] = doc.data()?['amount'] ?? 0;
+      }
+    }
+
+    return history;
   }
 
   Future<void> _initializeMessaging() async {
@@ -375,7 +408,7 @@ class AquaSyncProvider with ChangeNotifier {
     const scopes = ['https://www.googleapis.com/auth/firebase.messaging'];
 
     // Obter o cliente autenticado
-    final client = await clientViaServiceAccount(credentials, scopes);
+    final client = await clientViaServiceAccount(credentials, scopes, baseClient: http.Client());
 
     // Construir o payload da notificação
     final payload = {
