@@ -112,6 +112,15 @@ class AquaSyncProvider with ChangeNotifier {
   Future<void> addWater(int amount) async {
     if (user == null) return;
 
+    if (amount <= 0) {
+      Get.snackbar(
+        "Valor Inválido",
+        "O consumo de água deve ser um valor maior que zero.",
+        snackPosition: SnackPosition.TOP,
+      );
+      return;
+    }
+
     myWaterConsumption += amount;
 
     final now = DateTime.now();
@@ -151,7 +160,6 @@ class AquaSyncProvider with ChangeNotifier {
     try {
       // Impedir vínculo com a própria conta
       if (partnerEmail == user!.email) {
-        print('Erro: Não é possível vincular a própria conta.');
         return false;
       }
 
@@ -162,7 +170,6 @@ class AquaSyncProvider with ChangeNotifier {
           .get();
 
       if (querySnapshot.docs.isEmpty) {
-        print('Erro: Parceiro não encontrado.');
         return false;
       }
 
@@ -387,7 +394,6 @@ class AquaSyncProvider with ChangeNotifier {
             message.notification!.title ?? 'Nova Notificação',
             message.notification!.body ?? 'Você tem uma nova mensagem!',
           );
-          print('Mensagem recebida: ${message.notification!.title}');
         }
       });
 
@@ -397,7 +403,6 @@ class AquaSyncProvider with ChangeNotifier {
 
   Future<void> _sendPushNotificationV1(String token, String title, String body) async {
     if (firebaseServiceAccount == null) {
-      print("Credenciais do Firebase não foram carregadas!");
       return;
     }
     
@@ -431,7 +436,7 @@ class AquaSyncProvider with ChangeNotifier {
 
     // Fazer a solicitação HTTP POST para a API FCM V1
     final url = 'https://fcm.googleapis.com/v1/projects/aquasync-48758/messages:send';
-    final response = await client.post(
+    await client.post(
       Uri.parse(url),
       headers: {
         'Content-Type': 'application/json',
@@ -439,14 +444,6 @@ class AquaSyncProvider with ChangeNotifier {
       body: jsonEncode(payload),
     );
 
-    // Verificar o status da resposta
-    if (response.statusCode == 200) {
-      print('Notificação enviada com sucesso!');
-    } else {
-      print('Erro ao enviar notificação: ${response.body}');
-    }
-
-    // Fechar o cliente
     client.close();
   }
 
@@ -494,6 +491,4 @@ class AquaSyncProvider with ChangeNotifier {
   }
 }
 
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  print('Mensagem recebida em background: ${message.notification?.title}');
-}
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {}
