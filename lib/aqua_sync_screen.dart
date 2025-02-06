@@ -11,7 +11,6 @@ import 'package:aquasync/theme_controller.dart';
 import 'package:wave/config.dart';
 import 'package:wave/wave.dart';
 import 'package:confetti/confetti.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 
 class AquaSyncScreen extends StatefulWidget {
   const AquaSyncScreen({super.key});
@@ -142,82 +141,90 @@ class _AquaSyncScreenState extends State<AquaSyncScreen> with TickerProviderStat
   }
 
   void _checkDailyGoal(AquaSyncProvider provider) {
-  if (provider.myWaterConsumption >= dailyGoal && !_hasReachedGoal) {
-    _hasReachedGoal = true;
-    _confettiController.play();
+    if (provider.myWaterConsumption >= dailyGoal && !_hasReachedGoal) {
+      _hasReachedGoal = true;
+      _confettiController.play();
 
-    Future.delayed(Duration.zero, () {
-      showDialog(
-        context: context,
-        barrierDismissible: false, // Impede que o usuário feche o diálogo clicando fora
-        builder: (context) {
-          _parabensController.repeat();
-          _metaController.repeat();
+      Future.delayed(Duration.zero, () {
+        showDialog(
+          context: context,
+          barrierDismissible: false, // Impede que o usuário feche clicando fora
+          builder: (context) {
+            // Inicia animações repetitivas
+            _parabensController.repeat(reverse: true);
+            _metaController.repeat(reverse: true);
 
-          return GestureDetector(
-            onTap: () {
-              // Para as animações e fecha o diálogo ao tocar na tela
-              _parabensController.stop();
-              _metaController.stop();
-              Navigator.pop(context);
-            },
-            child: AlertDialog(
-              backgroundColor: Colors.transparent,
-              content: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Parabéns!',
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.pink,
-                        shadows: [
-                          Shadow(
-                            blurRadius: 5,
-                            color: Colors.pinkAccent,
-                            offset: Offset(2, 2),
-                          ),
-                        ],
-                      ),
-                    ).animate(controller: _parabensController) // Usa o controlador de animação
-                    .shimmer(duration: 1000.ms, color: Colors.pinkAccent) // Efeito cintilante mais rápido
-                    .scaleXY(begin: 1, end: 1.2, duration: 500.ms) // Efeito de escala mais rápido
-                    .then(delay: 500.ms) // Atraso menor entre animações
-                    .scaleXY(begin: 1.2, end: 1, duration: 500.ms), // Retorna ao tamanho original mais rápido
-                    const SizedBox(height: 10),
-                    Center(
-                      child: Text(
-                        'Você atingiu sua meta diária!',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.pink,
-                          shadows: [
-                            Shadow(
-                              blurRadius: 5,
-                              color: Colors.pinkAccent,
-                              offset: Offset(2, 2),
+            return GestureDetector(
+              onTap: () {
+                // Para animações e fecha o diálogo ao tocar na tela
+                _parabensController.stop();
+                _metaController.stop();
+                Navigator.pop(context);
+              },
+              child: Material(
+                color: Colors.transparent,
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      AnimatedBuilder(
+                        animation: _parabensController,
+                        builder: (context, child) {
+                          return Transform.scale(
+                            scale: 1 + 0.2 * _parabensController.value,
+                            child: Text(
+                              'Parabéns!',
+                              style: TextStyle(
+                                fontSize: 40,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.pink,
+                                shadows: [
+                                  Shadow(
+                                    blurRadius: 10,
+                                    color: Colors.pinkAccent,
+                                    offset: Offset(2, 2),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ],
-                        ),
-                      ).animate(controller: _metaController) // Usa o controlador de animação
-                      .shimmer(duration: 1000.ms, color: Colors.pinkAccent) // Efeito cintilante mais rápido
-                      .scaleXY(begin: 1, end: 1.1, duration: 500.ms) // Efeito de escala mais rápido
-                      .then(delay: 500.ms) // Atraso menor entre animações
-                      .scaleXY(begin: 1.1, end: 1, duration: 500.ms) // Retorna ao tamanho original mais rápido
-                    ),
-                  ],
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 20),
+                      AnimatedBuilder(
+                        animation: _metaController,
+                        builder: (context, child) {
+                          return Transform.scale(
+                            scale: 1 + 0.1 * _metaController.value,
+                            child: Text(
+                              'Você atingiu sua meta diária!',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                shadows: [
+                                  Shadow(
+                                    blurRadius: 10,
+                                    color: Colors.pinkAccent,
+                                    offset: Offset(2, 2),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          );
-        },
-      );
-    });
+            );
+          },
+        );
+      });
+    }
   }
-}
 
   Widget _buildWaterBottle(AquaSyncProvider provider) {
     double progress = provider.myWaterConsumption / dailyGoal;

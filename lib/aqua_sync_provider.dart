@@ -341,7 +341,7 @@ class AquaSyncProvider with ChangeNotifier {
     if (user == null) return {};
 
     final now = DateTime.now();
-    final last7Days = List.generate(7, (i) => now.subtract(Duration(days: i + 1)));
+    final last7Days = List.generate(7, (i) => now.subtract(Duration(days: i)));
     final formattedDates = last7Days.map((date) => date.toIso8601String().split('T').first).toList();
 
     Map<String, int> history = {for (var date in formattedDates) date: 0};
@@ -366,7 +366,7 @@ class AquaSyncProvider with ChangeNotifier {
     if (partnerUid == null) return {};
 
     final now = DateTime.now();
-    final last7Days = List.generate(7, (i) => now.subtract(Duration(days: i + 1)));
+    final last7Days = List.generate(7, (i) => now.subtract(Duration(days: i)));
     final formattedDates = last7Days.map((date) => date.toIso8601String().split('T').first).toList();
 
     Map<String, int> history = {for (var date in formattedDates) date: 0};

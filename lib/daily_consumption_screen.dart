@@ -31,7 +31,7 @@ class DailyConsumptionScreen extends StatelessWidget {
           }
 
           if (snapshot.hasData && snapshot.data!.isNotEmpty) {
-            final records = snapshot.data!;
+            final records = snapshot.data!.reversed.toList();
             return ListView(
               children: records.map((record) {
                 String formattedTime = _formatTime(record['timestamp']);
