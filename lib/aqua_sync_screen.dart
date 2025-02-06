@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:aquasync/aqua_sync_provider.dart';
@@ -9,6 +11,7 @@ import 'package:aquasync/theme_controller.dart';
 import 'package:wave/config.dart';
 import 'package:wave/wave.dart';
 import 'package:confetti/confetti.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 class AquaSyncScreen extends StatefulWidget {
   const AquaSyncScreen({super.key});
@@ -17,10 +20,34 @@ class AquaSyncScreen extends StatefulWidget {
   State<AquaSyncScreen> createState() => _AquaSyncScreenState();
 }
 
-class _AquaSyncScreenState extends State<AquaSyncScreen> {
+class _AquaSyncScreenState extends State<AquaSyncScreen> with TickerProviderStateMixin {
   int dailyGoal = 3000;
-  final ConfettiController _confettiController = ConfettiController(duration: const Duration(seconds: 3));
+  final ConfettiController _confettiController = ConfettiController(duration: const Duration(seconds: 4));
   bool _hasReachedGoal = false;
+  late AnimationController _parabensController;
+  late AnimationController _metaController;
+
+  @override
+  void initState() {
+    super.initState();
+    // Inicializa os controladores de animação
+    _parabensController = AnimationController(
+      vsync: this, // Usa o TickerProviderStateMixin
+      duration: const Duration(milliseconds: 500),
+    );
+    _metaController = AnimationController(
+      vsync: this, // Usa o TickerProviderStateMixin
+      duration: const Duration(milliseconds: 500),
+    );
+  }
+
+  @override
+  void dispose() {
+    // Descarta os controladores de animação para evitar vazamentos de memória
+    _parabensController.dispose();
+    _metaController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -115,22 +142,82 @@ class _AquaSyncScreenState extends State<AquaSyncScreen> {
   }
 
   void _checkDailyGoal(AquaSyncProvider provider) {
-    if (provider.myWaterConsumption >= dailyGoal && !_hasReachedGoal) {
-      _hasReachedGoal = true;
-      _confettiController.play();
+  if (provider.myWaterConsumption >= dailyGoal && !_hasReachedGoal) {
+    _hasReachedGoal = true;
+    _confettiController.play();
 
-      Future.delayed(Duration.zero, () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("🎉 Parabéns! Você atingiu sua meta diária!", textAlign: TextAlign.center),
-            duration: Duration(seconds: 5),
-          ),
-        );
-      });
+    Future.delayed(Duration.zero, () {
+      showDialog(
+        context: context,
+        barrierDismissible: false, // Impede que o usuário feche o diálogo clicando fora
+        builder: (context) {
+          _parabensController.repeat();
+          _metaController.repeat();
 
-      _confettiController.play();
-    }
+          return GestureDetector(
+            onTap: () {
+              // Para as animações e fecha o diálogo ao tocar na tela
+              _parabensController.stop();
+              _metaController.stop();
+              Navigator.pop(context);
+            },
+            child: AlertDialog(
+              backgroundColor: Colors.transparent,
+              content: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Parabéns!',
+                      style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.pink,
+                        shadows: [
+                          Shadow(
+                            blurRadius: 5,
+                            color: Colors.pinkAccent,
+                            offset: Offset(2, 2),
+                          ),
+                        ],
+                      ),
+                    ).animate(controller: _parabensController) // Usa o controlador de animação
+                    .shimmer(duration: 1000.ms, color: Colors.pinkAccent) // Efeito cintilante mais rápido
+                    .scaleXY(begin: 1, end: 1.2, duration: 500.ms) // Efeito de escala mais rápido
+                    .then(delay: 500.ms) // Atraso menor entre animações
+                    .scaleXY(begin: 1.2, end: 1, duration: 500.ms), // Retorna ao tamanho original mais rápido
+                    const SizedBox(height: 10),
+                    Center(
+                      child: Text(
+                        'Você atingiu sua meta diária!',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.pink,
+                          shadows: [
+                            Shadow(
+                              blurRadius: 5,
+                              color: Colors.pinkAccent,
+                              offset: Offset(2, 2),
+                            ),
+                          ],
+                        ),
+                      ).animate(controller: _metaController) // Usa o controlador de animação
+                      .shimmer(duration: 1000.ms, color: Colors.pinkAccent) // Efeito cintilante mais rápido
+                      .scaleXY(begin: 1, end: 1.1, duration: 500.ms) // Efeito de escala mais rápido
+                      .then(delay: 500.ms) // Atraso menor entre animações
+                      .scaleXY(begin: 1.1, end: 1, duration: 500.ms) // Retorna ao tamanho original mais rápido
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    });
   }
+}
 
   Widget _buildWaterBottle(AquaSyncProvider provider) {
     double progress = provider.myWaterConsumption / dailyGoal;
@@ -191,7 +278,7 @@ class _AquaSyncScreenState extends State<AquaSyncScreen> {
       child: ConfettiWidget(
         confettiController: _confettiController,
         blastDirection: 3.14 / 2,
-        numberOfParticles: 50,
+        numberOfParticles: 75,
         gravity: 0.5,
       ),
     );

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:aquasync/aqua_sync_provider.dart';
+import 'package:aquasync/daily_consumption_screen.dart';
 import 'package:intl/intl.dart';
 
 class HistoryScreen extends StatelessWidget {
@@ -13,7 +14,9 @@ class HistoryScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Histórico de Consumo'),
-        backgroundColor: Theme.of(context).brightness == Brightness.dark ? const Color.fromARGB(255, 75, 55, 140) : const Color.fromARGB(255, 235, 220, 255),
+        backgroundColor: Theme.of(context).brightness == Brightness.dark
+            ? const Color.fromARGB(255, 75, 55, 140)
+            : const Color.fromARGB(255, 235, 220, 255),
       ),
       body: FutureBuilder<Map<String, int>>(
         future: provider.getLast7DaysConsumption(),
@@ -35,8 +38,19 @@ class HistoryScreen extends StatelessWidget {
                 ...userHistory.entries.map((entry) {
                   String formattedDate = _formatDate(entry.key);
                   return ListTile(
-                    title: Text('Dia: $formattedDate', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                    subtitle: Text('Consumo: ${entry.value} ml', style: TextStyle(fontSize: 12)),
+                    title: Text(
+                        'Dia: $formattedDate',
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    subtitle: Text('Consumo: ${entry.value} ml', style: const TextStyle(fontSize: 12)),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => DailyConsumptionScreen(date: entry.key),
+                        ),
+                      );
+                    },
                   );
                 }),
                 if (provider.partnerUid != null)
@@ -44,9 +58,8 @@ class HistoryScreen extends StatelessWidget {
                     future: provider.getLast7DaysPartnerConsumption(),
                     builder: (context, partnerSnapshot) {
                       if (partnerSnapshot.connectionState == ConnectionState.waiting) {
-                        return const CircularProgressIndicator();
+                        return const Center(child: CircularProgressIndicator());
                       }
-
                       if (partnerSnapshot.hasData && partnerSnapshot.data!.isNotEmpty) {
                         final partnerHistory = partnerSnapshot.data!;
                         return Column(
@@ -61,8 +74,26 @@ class HistoryScreen extends StatelessWidget {
                             ...partnerHistory.entries.map((entry) {
                               String formattedDate = _formatDate(entry.key);
                               return ListTile(
-                                title: Text('Dia: $formattedDate', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                                subtitle: Text('Consumo: ${entry.value} ml', style: TextStyle(fontSize: 12)),
+                                title: Text(
+                                  'Dia: $formattedDate',
+                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                                ),
+                                subtitle: Text(
+                                  'Consumo: ${entry.value} ml',
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => DailyConsumptionScreen(
+                                        date: entry.key,
+                                        isPartner: true,
+                                      ),
+                                    ),
+                                  );
+                                },
                               );
                             }),
                           ],

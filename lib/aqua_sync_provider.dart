@@ -125,6 +125,7 @@ class AquaSyncProvider with ChangeNotifier {
 
     final now = DateTime.now();
     final today = now.toIso8601String().split('T').first;
+    final timestamp = now.toIso8601String();
     final userDocRef = _firestore.collection('users').doc(user!.uid);
     final dailyRef = userDocRef.collection(today);
 
@@ -133,6 +134,12 @@ class AquaSyncProvider with ChangeNotifier {
 
     // Atualiza a subcoleção do dia
     await dailyRef.doc('consumption').set({'amount': myWaterConsumption}, SetOptions(merge: true));
+
+    // Salva um novo registro com o horário exato
+    await dailyRef.doc(now.hour.toString().padLeft(2, '0') + now.minute.toString().padLeft(2, '0')).set({
+      'amount': amount,
+      'timestamp': timestamp,
+    });
 
     // Notificar parceiro, se vinculado
     final partnerSnapshot = await _firestore.collection('users').doc(user!.uid).get();
@@ -143,11 +150,19 @@ class AquaSyncProvider with ChangeNotifier {
       final partnerFcmToken = partnerDoc.data()?['fcmToken'];
 
       if (partnerFcmToken != null) {
-        await _sendPushNotificationV1(
-          partnerFcmToken,
-          'Seu parceiro bebeu água!',
-          '${user!.displayName ?? "Um usuário"} adicionou $amount ml ao consumo de água.',
-        );
+        if (myWaterConsumption >= dailyGoal) {
+          await _sendPushNotificationV1(
+            partnerFcmToken,
+            'Seu parceiro está de Parabéns! 🎉',
+            '${user!.displayName ?? "Seu parceiro"} atingiu a meta diária de $dailyGoal ml de água!',
+          );
+        } else {
+          await _sendPushNotificationV1(
+            partnerFcmToken,
+            'Seu parceiro bebeu água!',
+            '${user!.displayName ?? "Um usuário"} adicionou $amount ml ao consumo de água.',
+          );
+        }
       }
     }
 
@@ -370,6 +385,34 @@ class AquaSyncProvider with ChangeNotifier {
     }
 
     return history;
+  }
+
+  Future<List<Map<String, dynamic>>> getDailyConsumptionRecords(String date) async {
+    if (user == null) return [];
+
+    final dailyRef = _firestore.collection('users').doc(user!.uid).collection(date);
+    final querySnapshot = await dailyRef.orderBy('timestamp', descending: true).get();
+
+    return querySnapshot.docs.map((doc) {
+      return {
+        'amount': doc.data()['amount'] ?? 0,
+        'timestamp': doc.data()['timestamp'] ?? '',
+      };
+    }).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> getDailyConsumptionRecordsForPartner(String date) async {
+    if (partnerUid == null) return [];
+
+    final dailyRef = _firestore.collection('users').doc(partnerUid).collection(date);
+    final querySnapshot = await dailyRef.orderBy('timestamp', descending: true).get();
+
+    return querySnapshot.docs.map((doc) {
+      return {
+        'amount': doc.data()['amount'] ?? 0,
+        'timestamp': doc.data()['timestamp'] ?? '',
+      };
+    }).toList();
   }
 
   Future<void> _initializeMessaging() async {

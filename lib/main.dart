@@ -25,7 +25,7 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeController _themeController = Get.find();
+    final ThemeController themeController = Get.find();
 
     return Obx(() {
       return ChangeNotifierProvider(
@@ -33,7 +33,7 @@ class MyApp extends StatelessWidget {
         child: GetMaterialApp(
           debugShowCheckedModeBanner: false,
           title: 'Aqua Sync',
-          themeMode: _themeController.isDarkMode.value ? ThemeMode.dark : ThemeMode.light,
+          themeMode: themeController.isDarkMode.value ? ThemeMode.dark : ThemeMode.light,
           darkTheme: ThemeData.dark(),
           theme: ThemeData.light(),
           home: Consumer<AquaSyncProvider>(

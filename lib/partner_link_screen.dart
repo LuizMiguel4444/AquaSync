@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:aquasync/aqua_sync_provider.dart';
@@ -57,9 +59,13 @@ class PartnerLinkScreen extends StatelessWidget {
               ElevatedButton(
                 onPressed: () async {
                   await provider.removePartner();
+                  // ignore: duplicate_ignore
+                  // ignore: use_build_context_synchronously
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Parceiro desvinculado com sucesso!')),
                   );
+                  // ignore: duplicate_ignore
+                  // ignore: use_build_context_synchronously
                   Navigator.pop(context);
                 },
                 child: const Text('Desvincular Parceiro'),
