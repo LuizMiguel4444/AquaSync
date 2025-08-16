@@ -40,6 +40,7 @@ Você pode baixar a versão de instalação do app no GitHub Releases:
 - Flutter (Android)  
 - Dart  
 - GitHub para versionamento e distribuição do APK
+- Google FireBase
 
 ---
 
